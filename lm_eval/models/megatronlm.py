@@ -109,6 +109,16 @@ class MegatronServerLM(BaseLM):
     def tok_decode_batch(self, tokens_batch):
         return self.detokenizer_query(tokens_batch)
 
+    def encode_requests(self, requests):
+        samples = []
+        for req_els in requests:
+            sample = ""
+            for req_el in req_els:
+                sample += req_el
+        samples_enc = self.tok_encode_batch(samples)
+        samples_rgx = [utils.tokenize(el) for el in samples]
+        return [(len(toks), len(words)) for toks, words in zip(samples_enc, samples_rgx)]
+
     def loglikelihood(self, requests):
         new_reqs = []
         contexts = []
@@ -155,6 +165,7 @@ class MegatronServerLM(BaseLM):
 
             new_reqs.append((request, context_enc, continuation_enc))
 
+        # return request encoding (lengths) here
         return self._loglikelihood_tokens(new_reqs)
 
     def _loglikelihood_tokens(self, requests, disable_tqdm=False):
@@ -246,6 +257,8 @@ class MegatronServerLM(BaseLM):
                 context_enc = self.tok_encode(context)
                 inp = context_enc[-(self.max_length - self.max_gen_toks) :]
                 inps.append(inp)
+            
+            # return endocing (lengths) here
 
             if isinstance(until, str):
                 until = [until]

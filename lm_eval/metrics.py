@@ -257,3 +257,8 @@ def yesno(x):
         return "yes"
     else:
         return "no"
+
+def fertility(items):
+    total_toks = sum([sum([i[0] for i in doc]) for doc in items])
+    total_wrds = sum([sum([i[1] for i in doc]) for doc in items])
+    return total_toks/total_wrds
