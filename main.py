@@ -38,6 +38,7 @@ def parse_args():
     )
     parser.add_argument("--detailed_eval_info_path", type=str, default=None)
     parser.add_argument("--bootstrap_iters", type=int, default=100000)
+    parser.add_argument("--fertility_only", action="store_true", default=False)
 
     return parser.parse_args()
 
@@ -80,6 +81,7 @@ def main():
         write_out=args.write_detailed_eval_info,
         output_base_path=args.detailed_eval_info_path,
         bootstrap_iters=args.bootstrap_iters,
+        fertility_only=args.fertility_only
     )
 
     dumped = json.dumps(results, indent=2)

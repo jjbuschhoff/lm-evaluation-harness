@@ -283,3 +283,17 @@ def run_task_tests(task_list: List[str]):
         raise ValueError(
             f"Not all tests for the specified tasks ({task_list}) ran successfully! Error code: {pytest_return_val}"
         )
+
+def tokenize(txt):
+    PAT = r'\w+|[\d\.]+([\d]+)?|\S+'
+    tokens = []
+    start = 0
+    while True:
+        match = re.search(PAT, txt)
+        if match:
+            start = match.end()
+            tokens += [match.group()]
+            txt = txt[start:] # this is bad
+            continue
+        break
+    return tokens

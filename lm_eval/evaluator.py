@@ -26,6 +26,7 @@ def simple_evaluate(
     no_tokenizer_check=False,
     write_out=False,
     output_base_path=None,
+    fertility_only=False
 ):
     """Instantiate and evaluate a model on a list of tasks.
 
@@ -110,6 +111,7 @@ def simple_evaluate(
         decontamination_ngrams_path=decontamination_ngrams_path,
         write_out=write_out,
         output_base_path=output_base_path,
+        fertility_only=fertility_only
     )
 
     # add info about the model and few shot config
@@ -143,6 +145,7 @@ def evaluate(
     decontamination_ngrams_path=None,
     write_out=False,
     output_base_path=None,
+    fertility_only=False
 ):
     """Instantiate and evaluate a model on a list of tasks.
 
@@ -294,10 +297,15 @@ def evaluate(
         #       they should end up next to each other.
 
         print("Running", reqtype, "requests")
-        resps = getattr(lm, reqtype)([req.args for req in reqs])
-        resps = [
-            x if req.index is None else x[req.index] for x, req in zip(resps, reqs)
-        ]
+
+        # launch fertility request here
+        if fertility_only:
+            resps = lm.encode_requests([req.args for req in reqs], reqtype)
+        else:
+            resps = getattr(lm, reqtype)([req.args for req in reqs])
+            resps = [
+                x if req.index is None else x[req.index] for x, req in zip(resps, reqs)
+            ]
 
         for resp, (i, task_name, doc, doc_id) in zip(resps, requests_origin[reqtype]):
             process_res_queue[(task_name, doc_id)].append((i, resp))
@@ -324,11 +332,13 @@ def evaluate(
     for (task_name, doc_id), requests in process_res_queue.items():
         requests.sort(key=lambda x: x[0])
         requests = [x[1] for x in requests]
-
         task = task_dict[task_name]
         doc = docs[(task_name, doc_id)]
 
-        metrics = task.process_results(doc, requests)
+        if fertility_only:
+            metrics = {"fertility":requests}
+        else:
+            metrics = task.process_results(doc, requests)
         for metric, value in metrics.items():
             vals[(task_name, metric)].append(value)
 
@@ -348,20 +358,23 @@ def evaluate(
             real_metric = metric.replace(
                 decontaminate_suffix, ""
             )  # decontaminated still uses the same metric
-        results[task_name][metric] = task.aggregation()[real_metric](items)
+        if fertility_only:
+            results[task_name]["fertility"] = lm_eval.metrics.fertility(items)
+        else:
+            results[task_name][metric] = task.aggregation()[real_metric](items)
 
-        # hotfix: bleu, chrf, ter seem to be really expensive to bootstrap
-        # so we run them less iterations. still looking for a cleaner way to do this
+            # hotfix: bleu, chrf, ter seem to be really expensive to bootstrap
+            # so we run them less iterations. still looking for a cleaner way to do this
 
-        stderr = lm_eval.metrics.stderr_for_metric(
-            metric=task.aggregation()[real_metric],
-            bootstrap_iters=min(bootstrap_iters, 1000)
-            if metric in ["bleu", "chrf", "ter"]
-            else bootstrap_iters,
-        )
+            stderr = lm_eval.metrics.stderr_for_metric(
+                metric=task.aggregation()[real_metric],
+                bootstrap_iters=min(bootstrap_iters, 1000)
+                if metric in ["bleu", "chrf", "ter"]
+                else bootstrap_iters,
+            )
 
-        if stderr is not None:
-            results[task_name][metric + "_stderr"] = stderr(items)
+            if stderr is not None:
+                results[task_name][metric + "_stderr"] = stderr(items)
 
     if write_out:
         import json
